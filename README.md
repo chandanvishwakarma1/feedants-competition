@@ -47,7 +47,7 @@ npx expo start            # scan the QR code with Expo Go
 
 | Variable | Description |
 |---|---|
-| `EXPO_PUBLIC_API_BASE_URL` | Backend base URL including `/api`, e.g. `http://192.168.1.23:5000/api` |
+| `EXPO_PUBLIC_API_BASE_URL` | Backend base URL including `/api`, e.g. `http://<your-computer-ip>:5000/api` |
 
 `EXPO_PUBLIC_API_BASE_URL` is read in `src/api/client.ts`. On a physical phone use your
 computer's LAN IP (not `localhost`), and restart `expo start` after editing `.env` (values are
