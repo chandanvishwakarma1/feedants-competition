@@ -1,3 +1,5 @@
+**Demo video:** https://www.loom.com/share/5e3fd3f0c4624f778d02ae8430a553e4
+
 # Feedants — Competition Details Screen (Full Stack)
 
 A functional implementation of the Competition Details screen: React Native (Expo SDK 57 +
@@ -9,7 +11,7 @@ through the API; nothing is hardcoded in the app.
 
 ```
 feedants-competition/
-  backend/    Express + MongoDB API (controllers, models, routes, seed)
+  backend/    Express + MongoDB API (controllers, models, routes, seed, scripts)
   frontend/   Expo app (src/app = routes, src/components, src/hooks, src/api)
 ```
 
@@ -29,6 +31,7 @@ npm run dev               # http://localhost:5000  (health check: /health)
 | `MONGO_URI` | MongoDB connection string, **including the database name** (e.g. `.../feedants?...`) |
 | `JWT_SECRET` | Secret used to sign auth tokens |
 | `JWT_EXPIRES_IN` | Token lifetime, e.g. `7d` |
+| `DISABLE_RATE_LIMIT` | Optional. `true` turns off the register-endpoint rate limiter (used only by the smoke test) |
 
 `.env` files are git-ignored. Never commit real credentials; only the `.env.example`
 placeholders are tracked.
@@ -59,6 +62,61 @@ inlined at bundler start, not hot-reloaded).
 | `competition/[id].tsx` | `/competition/:id` | The Competition Details screen |
 | `login.tsx` | `/login` | Login / sign-up with client + server validation |
 | `results/[id].tsx` | `/results/:id` | Placeholder results screen |
+
+## Testing and demo tools
+
+Two scripts live in `backend/scripts/`. Both read `MONGO_URI` from `backend/.env` and are meant
+for local development only. Never point them at a production database.
+
+### Smoke test: `npm run test:smoke`
+
+An end-to-end test that calls the running API over HTTP and edits the competition's dates in
+MongoDB to move it through its lifecycle. It exits with a non-zero code if any check fails.
+It covers:
+
+- **Auth validation:** short name, bad email, short password, duplicate email, wrong password.
+- **Viewer states:** the bottom button (CTA) for logged-out, logged-in-but-unregistered,
+  registered and already-submitted users, in the registration and submission phases.
+- **Registration rules:** success, duplicate registration, registering after the deadline, and
+  registering when spots are full.
+- **Submission rules:** before the window opens, missing media URL, unregistered user,
+  registered user, and the disabled state after submitting.
+- **Lifecycle phases:** upcoming → registration closed → submission open → judging → results.
+- **Concurrency:** 30 users race for the last spot and exactly one wins, and one user
+  double-tapping Register 5 times consumes exactly one spot (which exercises the rollback).
+
+```bash
+# Terminal 1: start the API with the rate limiter off (30 requests come from one IP)
+# PowerShell
+$env:DISABLE_RATE_LIMIT="true"; npm run dev
+# bash / zsh
+DISABLE_RATE_LIMIT=true npm run dev
+
+# Terminal 2
+npm run test:smoke
+```
+
+The test rewrites the first competition's dates and spot counts and creates users named
+`t_<timestamp>_<n>@test.com`. Run `npm run phase -- login` afterwards to reset the competition.
+
+### Phase switcher: `npm run phase -- <phase>`
+
+Moves the first competition into a chosen state so every UI state can be shown without waiting
+for real dates to pass. Pull to refresh in the app after running it.
+
+| Phase | State it sets | What the app shows |
+|---|---|---|
+| `login` | Registration open, 1/20 booked, **all registrations and submissions deleted** | Clean slate for the log in → register flow |
+| `upcoming` | Registration open, 1/20 booked | Countdown "Registration closes in", **Register** |
+| `last_spot` | Registration open, 1 spot left | "Only 1 spots left" (for the race demo) |
+| `full` | Registration open, 0 spots left | "Fully booked", **Registration Closed** |
+| `closed` | Registration ended, submissions not started | "Submissions open in" |
+| `submission` | Submission window open | "Submissions close in", **Upload Submission** for registered users |
+| `judging` | Submissions ended, results pending | **Judging in Progress** |
+| `results` | Result date passed | **View Results** |
+
+Only the `login` phase deletes data. The other phases change dates and the spot counter, and
+leave users and registrations alone.
 
 ## API overview
 
@@ -120,7 +178,8 @@ use server-provided data.
 silently re-fetches, so the "Registered" state and CTA update without a manual pull-to-refresh.
 
 ## Assumptions
-
+- **Dev tooling is destructive by design.** `npm run phase -- login` and the smoke test modify
+  the sample competition (and the smoke test creates test users). They are for local/demo data only.
 - **Auth is minimal.** Email/password + JWT — enough to have a real per-user "am I
   registered" state, not a production identity system (no OTP, social login, password reset).
 - **Payment is not integrated.** `entryFee` is displayed and "Secure payments powered by
@@ -155,8 +214,9 @@ silently re-fetches, so the "Registered" state and CTA update without a manual p
   rather than accepting an arbitrary `mediaUrl`.
 - **Auth hardening:** refresh tokens, secure token storage, login rate limiting and account
   lockout.
-- **Testing:** I'd write unit/integration tests first for the two critical pieces —
-  `derivePhase` (a phase-transition table test) and `registerForCompetition` (a load test
-  firing many simultaneous requests at the last spot to prove no overbooking).
+- **Testing:** the smoke test covers the critical paths end to end, including the concurrent
+  registration race. With more time I'd move it into Jest + Supertest against an in-memory
+  MongoDB so it runs in CI, add unit tests for `derivePhase` as a phase-transition table, and
+  add component tests for the frontend.
 - **Home route:** `src/app/index.tsx` currently redirects to the first competition returned by
   the API; a production app would render a real competitions list/home screen there.
