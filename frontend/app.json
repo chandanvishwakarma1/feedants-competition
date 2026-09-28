@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Feedants Competition",
+    "slug": "feedants-competition",
+    "scheme": "feedants",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router",
+      "expo-status-bar"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0F6E5E"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
